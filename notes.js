@@ -29,6 +29,9 @@ function renderConcept(concept) {
 function renderProjectFlow(steps) {
   return `<ol class="project-flow">${steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>`;
 }
+function renderDebateActions(key) {
+  return `<div class="debate-actions"><label><span class="sr-only">Mức debate</span><select data-debate-level aria-label="Mức debate"><option>Middle</option><option>Middle+</option></select></label><button type="button" data-debate-copy="${escapeHtml(key)}">Copy mục + prompt debate</button><span class="debate-status" role="status"></span></div>`;
+}
 function renderProjectCase(item, index, project) {
   const prefix = `project-${item.id}`;
   const status = item.status === 'actual' ? (project.actualLabel || (project.topic === 'Database' ? 'Đã triển khai' : `Đã dùng ${project.topic}`)) : (project.proposalLabel || `Đề xuất ${project.topic}`);
@@ -44,7 +47,7 @@ function renderProjectCase(item, index, project) {
       <section class="project-step" data-project-step="3" aria-labelledby="${prefix}-overview"><h4 id="${prefix}-overview">3/ Tổng quan xử lý</h4>${renderProjectFlow(item.flow)}<ul>${item.roles.map(role => `<li>${escapeHtml(role)}</li>`).join('')}</ul></section>
       <details id="${prefix}-implementation" class="project-implementation" data-project-step="4"><summary>4/ Ghi chú chi tiết / Implementation</summary><div>${item.implementation.map(block => `<section class="project-detail"><h5>${escapeHtml(block.title)}</h5><p>${escapeHtml(block.text)}</p>${block.flow ? renderProjectFlow(block.flow) : ''}${block.points?.length ? `<ul>${block.points.map(point => `<li>${escapeHtml(point)}</li>`).join('')}</ul>` : ''}</section>`).join('')}</div></details>
       <section class="project-speaking" aria-labelledby="${prefix}-spoken"><h4 id="${prefix}-spoken">Tập trả lời trong 30–60 giây</h4><p class="project-frame">${item.frame.map(escapeHtml).join(' → ')}</p><blockquote>${escapeHtml(item.spoken)}</blockquote></section>
-      <section class="project-practice" aria-labelledby="${prefix}-practice"><h4 id="${prefix}-practice">Câu hỏi từ case này <span>${item.questions.length} câu</span></h4><button type="button" class="interview-start" data-interview-entry="project:${escapeHtml(item.id)}">Phỏng vấn case này</button>${item.questions.map((question, i) => `<details id="${prefix}-question-${i + 1}" class="project-question"><summary>${escapeHtml(question.title)}</summary><p>${escapeHtml(question.answer)}</p></details>`).join('')}</section>
+      <section class="project-practice" aria-labelledby="${prefix}-practice"><h4 id="${prefix}-practice">Câu hỏi từ case này <span>${item.questions.length} câu</span></h4>${renderDebateActions(`project:${item.id}`)}${item.questions.map((question, i) => `<details id="${prefix}-question-${i + 1}" class="project-question"><summary>${escapeHtml(question.title)}</summary><p>${escapeHtml(question.answer)}</p></details>`).join('')}</section>
       <p class="sources">Đối chiếu cơ chế: ${sources}</p>
     </div></details>`;
 }
@@ -98,7 +101,7 @@ function renderTheory(group) {
     ${renderExample(example)}
     ${comparison}<h4>Giới hạn & đánh đổi</h4><ul class="theory-tradeoffs">${lesson.tradeoffs.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
     <p class="sources theory-sources">Đọc thêm: ${renderSources(lesson.sources, group.topic)}</p>
-    <button type="button" class="interview-start" data-interview-entry="lesson:${escapeHtml(group.id)}">Phỏng vấn mục này</button>
+    ${renderDebateActions(`lesson:${group.id}`)}
   </section>`;
 }
 const lessonSearchText = new Map(studyGroups.map(group => {

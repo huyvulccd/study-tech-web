@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="styles.css">
 <script src="content/study-content.js" defer></script><script src="content/kafka.js" defer></script><script src="content/kafka-lessons.js" defer></script><script src="content/kafka-project.js" defer></script>
 <script src="content/redis.js" defer></script><script src="content/redis-project.js" defer></script><script src="content/database.js" defer></script><script src="content/database-project.js" defer></script><script src="content/patterns.js" defer></script><script src="content/patterns-project.js" defer></script>
-<script src="app.js" defer></script><script src="notes.js" defer></script><script src="interview-core.js" defer></script><script src="interview-ai.js" defer></script><script src="interview.js" defer></script>
+<script src="app.js" defer></script><script src="notes.js" defer></script><script src="debate.js" defer></script>
 </head>
 <body>
 <header class="site-header"><a href="index.html">Sổ tay của tôi</a><span>Học & ghi chép</span></header>
@@ -15,7 +15,7 @@
 <div class="topic-links" aria-label="Chủ đề"></div>
 <section id="study-guide" class="study-guide" aria-label="Khung ôn tập"></section>
 <div class="tools"><label class="search"><span aria-hidden="true">⌕</span><input type="search" id="search-input" placeholder="Tìm kiến thức, câu hỏi, dự án…" aria-label="Tìm kiến thức, câu hỏi hoặc dự án"></label><label class="saved-filter"><input type="checkbox" id="only-saved"> Chỉ câu đã lưu <span id="saved-count"></span></label></div>
-<div id="kind-filters" class="kind-filters" aria-label="Loại câu hỏi"><button data-kind="all" class="active">Tất cả</button><button data-kind="theory">Lý thuyết</button><button data-kind="scenario">Xử lý tình huống</button><button id="interview-history" type="button">Lịch sử phỏng vấn</button></div>
+<div id="kind-filters" class="kind-filters" aria-label="Loại câu hỏi"><button data-kind="all" class="active">Tất cả</button><button data-kind="theory">Lý thuyết</button><button data-kind="scenario">Xử lý tình huống</button></div>
 <p id="results-status" class="results-status" role="status"></p>
 <div id="question-list"></div>
 <details id="project-section" class="learning-topic project-section" hidden></details>
@@ -23,5 +23,5 @@
 </section>
 <footer>Java và Keycloak sẽ được bổ sung sau.</footer>
 </main>
-<dialog id="interview-dialog" aria-labelledby="interview-heading"><div class="interview-dialog-heading"><h2 id="interview-heading">Phỏng vấn theo chủ đề</h2><button type="button" data-interview-close aria-label="Đóng phiên phỏng vấn">Đóng</button></div><div id="interview-content"></div><p id="interview-status" role="status" aria-live="polite"></p></dialog>
+<dialog id="debate-dialog" aria-labelledby="debate-title"><div class="debate-dialog-heading"><h2 id="debate-title">Sao chép nội dung debate</h2><button type="button" data-debate-close>Đóng</button></div><p>Nhấn Ctrl+C hoặc Cmd+C để sao chép nội dung đang chọn, rồi dán vào công cụ AI bạn muốn dùng.</p><label for="debate-prompt">Nội dung mục học và prompt debate</label><textarea id="debate-prompt" readonly rows="14"></textarea><button type="button" data-debate-select>Chọn toàn bộ</button></dialog>
 </body></html>
