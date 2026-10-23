@@ -16,6 +16,7 @@ const studySubjects = [
     project: kafkaProject,
   },
   { ...redisSubject, slug: 'redis', project: redisProject },
+  { ...keycloakSubject, slug: 'keycloak', project: keycloakProject },
   { ...patternSubject, slug: 'patterns', project: patternProject },
 ];
 const subjectsByTopic = Object.fromEntries(studySubjects.map(subject => [subject.topic, subject]));

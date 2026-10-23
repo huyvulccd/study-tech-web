@@ -1,0 +1,55 @@
+const keycloakProject = {
+  topic: 'Keycloak', name: 'Đề xuất Keycloak cho Car Sharing System',
+  context: 'Mô tả dự án đã có access token/session dùng Redis, Spring Security và luồng mobile → web. Chưa có thông tin xác nhận dùng Keycloak, OIDC, một loại token cụ thể hoặc kiến trúc SSO production.',
+  introduction: 'Hai case dưới đây là phương án mở rộng để luyện thiết kế Middle/Middle+, không phải kinh nghiệm đã triển khai. Cần đối chiếu code và yêu cầu đăng nhập/phân quyền trước khi chọn. Keycloak không tự thay toàn bộ Redis hoặc dữ liệu member nghiệp vụ.',
+  sources: keycloakSubject.sources,
+  cases: [
+    {
+      id: 'keycloak-project-central-login', status: 'proposal', title: 'Đăng nhập tập trung cho mobile, web và API',
+      basis: 'Liên hệ nhu cầu mobile/web và session đã có trong mô tả. Dùng Keycloak làm nguồn xác thực tập trung là đề xuất; chưa khẳng định đã migration, dùng SSO hay cải thiện chỉ số production.',
+      perspective: 'Member dùng mobile để tìm/đặt xe và mở một chức năng web liên quan. Họ cần được nhận diện đúng, truy cập đúng booking và đăng nhập lại theo chính sách rõ ràng.',
+      problem: 'Các ứng dụng có thể phải duy trì logic đăng nhập riêng; handoff mobile → web dễ bị hiểu thành chép token vào URL. Thêm IAM còn cần bảo toàn liên kết member cũ và không làm sai logout/quyền truy cập.',
+      why: 'Keycloak phù hợp nếu cần tập trung xác thực, quản lý phiên, MFA hoặc nhiều client theo chuẩn OIDC. Nếu hệ thống hiện tại đáp ứng đủ và chi phí migration lớn, chưa có lý do thay chỉ vì có thêm công cụ.',
+      flow: ['Đăng ký client mobile/web và xác định luồng browser/BFF.', 'Member đăng nhập qua Keycloak bằng Code + PKCE.', 'Client nhận token đúng mục đích; không đưa token vào URL handoff.', 'Reservation API xác minh issuer, chữ ký, thời gian và audience.', 'Liên kết issuer/sub với member và kiểm tra ownership của booking.'],
+      roles: ['Keycloak quản lý xác thực/phiên và phát token theo client.', 'Client thực hiện flow, bảo vệ state/token và xử lý refresh/logout.', 'Reservation service giữ dữ liệu booking, liên kết member và quyết định quyền đối tượng.', 'Redis chỉ tiếp tục giữ state/cache nào còn cần theo thiết kế; không mặc định là nơi Keycloak lưu session.'],
+      implementation: [
+        { title: 'Chọn kiến trúc và liên kết danh tính', text: 'Làm rõ web là SPA hay có BFF; mobile dùng system browser theo thư viện chuẩn. Tạo quan hệ external identity với member đã tồn tại theo issuer/sub sau xác minh.', points: ['Không dùng email trùng nhau làm căn cứ tự gộp tài khoản.', 'Không khẳng định login mobile đã tạo cùng browser session cho web.', 'Migration cần quy trình chuyển/khôi phục tài khoản phù hợp; không tự hứa chuyển password hash là xong.'] },
+        { title: 'Bảo vệ API và luồng mobile → web', text: 'Backend dùng Resource Server JWT, kiểm tra audience reservation-service và ánh xạ client roles cần thiết. Web thực hiện flow riêng thay vì nhận raw token từ query string.', points: ['SSO chỉ giảm tương tác nếu context/phiên/policy cho phép.', 'RESERVATION_READ chưa đủ xem booking: vẫn kiểm tra member/tenant.', 'Nếu cần cơ chế handoff riêng, phải đánh giá bảo mật và lifecycle; chưa khẳng định dự án đã dùng ticket một lần.'] },
+        { title: 'Vòng đời phiên và giai đoạn chuyển đổi', text: 'Lập chính sách access token, refresh, session max/idle và logout. Xác định rõ state Redis cũ giữ lại, chuyển đổi hoặc loại bỏ phần nào.', points: ['Test token cũ sau logout và token của hệ thống cũ trong giai đoạn migration.', 'Không mở chấp nhận hai issuer/token format vô thời hạn mà thiếu policy.', 'Kiểm tra login mới, refresh, token hết hạn và JWKS unavailable, không chỉ happy path.'] },
+      ],
+      frame: ['Nhu cầu đăng nhập nhiều client', 'Ranh giới Keycloak/client/API', 'Liên kết member và ownership', 'Session/logout/migration', 'Điều kiện nên triển khai'],
+      spoken: 'Dự án em đã làm token/session với Redis và Spring Security; chưa xác nhận dùng Keycloak. Nếu mở rộng đăng nhập tập trung, em đề xuất OIDC Code + PKCE cho mobile/web, mỗi client có flow và token phù hợp. API xác minh issuer/audience rồi liên kết subject với member và kiểm tra booking thuộc quyền người gọi. Em làm rõ browser context cho mobile sang web, không truyền token qua URL. Trước khi thay hệ thống cũ cần chốt migration và vòng đời session/logout; Redis có giữ lại hay không tùy state thực tế.',
+      questions: [
+        { title: 'Đã có Redis session thì Keycloak thay Redis luôn được không?', answer: 'Không thể kết luận. Redis là kho state theo thiết kế hiện tại, Keycloak là IAM. Phải tách trách nhiệm xác thực, session ứng dụng, cache và nghiệp vụ rồi chọn phần giữ/chuyển; Keycloak không mặc định dùng Redis session của dự án.' },
+        { title: 'Làm sao member cũ vẫn xem đúng booking sau migration?', answer: 'Có quan hệ liên kết external identity với member nghiệp vụ bằng quy trình xác minh đáng tin. Test tài khoản trùng email, đổi email, nhiều nguồn danh tính và tài khoản đã khóa; không tự nối chỉ vì username giống.' },
+        { title: 'Mobile đã login thì web chắc chắn không phải login lại chứ?', answer: 'Không chắc. Cần xét system browser/browser context, phiên SSO và chính sách. Web vẫn chạy flow riêng; không dùng token query string làm cách ép SSO.' },
+      ], sources: ['browser', 'oidc', 'spring', 'admin', 'logout'],
+    },
+    {
+      id: 'keycloak-project-service-auth', status: 'proposal', title: 'Quyền service và quyền người khởi tạo thao tác',
+      basis: 'Dùng bối cảnh reservation/payment để luyện phân tách danh tính và quyền. Chưa xác nhận topology, gateway, các client/role hoặc luồng hoàn tiền cụ thể trong production; tất cả cấu hình dưới đây là minh họa đề xuất.',
+      perspective: 'Nhân viên được phân công có thể yêu cầu thao tác trên booking/thanh toán. Job đối soát chạy không có user đang login. Cả hai cần được kiểm soát nhưng không dùng chung danh tính ADMIN.',
+      problem: 'Token user có thể không dành cho API downstream; còn service token quyền cao có thể bị dùng để thực hiện yêu cầu user không có quyền. Chỉ đặt kiểm tra tại gateway cũng có thể để sót đường gọi service trực tiếp.',
+      why: 'Service account cho ứng dụng một danh tính độc lập và quyền tối thiểu. Resource Server bảo vệ API nhận; kiểm tra nghiệp vụ và audit vẫn cần để biết ai khởi tạo, service nào thực hiện và đối tượng nào được phép tác động.',
+      flow: ['Backend xác minh token của user nếu là thao tác do user khởi tạo.', 'Kiểm tra quyền chức năng, phạm vi dữ liệu và trạng thái nghiệp vụ.', 'Chọn propagation/token phù hợp nếu cần quyền user, hoặc Client Credentials nếu dùng quyền service.', 'API đích xác minh audience và quyền caller, không tin header user tùy ý.', 'Thực hiện thao tác idempotent theo nghiệp vụ và ghi audit người khởi tạo/service thực hiện.'],
+      roles: ['Client user mang danh tính người thao tác, chỉ nhận quyền cần cho ứng dụng.', 'Service account có role giới hạn theo công việc, ví dụ quyền đối soát đọc khác quyền hoàn tiền.', 'Payment/reservation service kiểm tra dữ liệu, trạng thái và chống lặp theo contract nghiệp vụ.', 'Gateway kiểm soát điểm vào; các đường trực tiếp đến service cũng phải có chính sách trust rõ ràng.'],
+      implementation: [
+        { title: 'Tách hai loại caller', text: 'Job tự chạy dùng Client Credentials, không mượn tài khoản nhân viên. Với thao tác user, xác định downstream cần quyền user hay nhận lệnh đã được service ủy quyền kiểm tra.', points: ['Nếu forward user token, audience đích phải phù hợp; không bỏ validator để token đi được.', 'Nếu dùng service token, backend trước phải kiểm tra quyền user và không nhận lệnh tùy ý bằng quyền cao.', 'Chưa cần triển khai token exchange khi mô hình đơn giản đã đủ; đây là lựa chọn phải có policy khi thực sự cần.'] },
+        { title: 'Least privilege và business enforcement', text: 'Cấp role theo API/hành động, cấu hình audience và converter đúng client namespace. Đặt điều kiện ownership/tenant/trạng thái gần nguồn dữ liệu.', points: ['Có PAYMENT_REFUND không có nghĩa được hoàn mọi giao dịch ở mọi trạng thái.', 'Mỗi lần retry nghiệp vụ vẫn cần idempotency/transaction phù hợp; JWT không chống double refund.', 'Không forward credential vào event Kafka chỉ để giữ dấu vết; dùng audit metadata cần thiết và bảo vệ nguồn ghi.'] },
+        { title: 'Credentials, sự cố và audit', text: 'Giữ credentials ở server, thay theo chính sách và tái sử dụng access token còn hợp lệ trong giới hạn an toàn. Khi không xác minh được caller thì từ chối có kiểm soát.', points: ['Không xin token ở mỗi business request nếu có thể quản lý vòng đời hợp lý.', 'Ghi actor đã xác minh, service thực hiện, đối tượng, kết quả và trace; che token/secret.', 'Test user thiếu quyền, service sai audience, token hết hạn và dependency cấp token lỗi.'] },
+      ],
+      frame: ['User hay service', 'Audience và quyền tối thiểu', 'Quyền đối tượng/trạng thái', 'Chống lặp và audit', 'Failure có kiểm soát'],
+      spoken: 'Nếu áp dụng Keycloak cho gọi giữa các service, em tách job chạy bằng service account khỏi thao tác có user khởi tạo. Em không tự đổi sang token service quyền cao khi user bị thiếu quyền. API đích kiểm tra audience và client role; nghiệp vụ vẫn kiểm tra đối tượng, trạng thái và idempotency. Nếu cần biết nhân viên nào yêu cầu, em giữ audit từ danh tính đã xác minh cùng service thực hiện, không tin một header tùy ý. Đây là phương án đề xuất để luyện thiết kế, chưa phải luồng Keycloak em xác nhận đã làm trong dự án.',
+      questions: [
+        { title: 'Token của user không có audience payment-service thì cứ forward thử được không?', answer: 'Không bỏ qua hợp đồng token. Cần thiết kế cấp token/audience phù hợp nếu downstream thực hiện thay user, hoặc gọi bằng service identity sau bước kiểm tra/ủy quyền rõ ràng. Không mở mọi audience theo thói quen.' },
+        { title: 'Client Credentials có chứng minh nhân viên đã được phép hoàn tiền không?', answer: 'Không. Nó chứng minh service caller. Quyền của nhân viên phải được kiểm tra ở ranh giới đã thiết kế, thông tin audit phải có nguồn tin cậy và payment vẫn kiểm tra nghiệp vụ/caller của nó.' },
+        { title: 'Đã xác thực service rồi cần idempotency nữa không?', answer: 'Có. Xác thực/quyền quyết định ai được gọi, còn idempotency/transaction xử lý retry và thao tác lặp. Token hợp lệ không ngăn hoàn tiền hai lần.' },
+      ], sources: ['oauth', 'admin', 'spring', 'methods', 'bcp'],
+    },
+  ],
+  exclusions: [
+    { title: 'Xác nhận kinh nghiệm Keycloak production', reason: 'Chưa có thông tin đã triển khai; không đổi các case đề xuất thành việc đã làm hoặc thêm số đo hiệu năng.' },
+    { title: 'Chuyển mọi hồ sơ nghiệp vụ vào IAM', reason: 'Booking, thanh toán và điểm vẫn cần nguồn quản lý nghiệp vụ. Keycloak không thay DB, transaction hoặc xử lý concurrency.' },
+    { title: 'SPI, SAML nâng cao và vận hành cluster', reason: 'Ngoài trọng tâm backend Middle/Middle+ hiện tại; chỉ học thêm khi vị trí hoặc dự án yêu cầu.' },
+  ],
+};
