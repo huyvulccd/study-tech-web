@@ -33,20 +33,20 @@ function makeRunner(cli) {
     const child = spawn(process.execPath, [cli, '--skip-trust', '--prompt', 'Answer the interview task supplied on standard input.', '--output-format', 'json', '--admin-policy', policy, '--extensions', 'none'], { cwd: folder, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     let stdout = '', stderr = '', settled = false;
     function finish(error, result) { if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener('abort', abort); if (error) reject(error); else resolve(result); }
-    function abort() { child.kill(); finish(new Error('Generation cancelled or timed out.')); }
+    function abort() { child.kill(); finish(new Error('Đã dừng hoặc Gemini mất quá lâu để trả lời.')); }
     const timer = setTimeout(abort, 150000);
     signal?.addEventListener('abort', abort, { once: true });
     if (signal?.aborted) abort();
-    child.on('error', () => finish(new Error('Could not start Gemini CLI. Check the installation.')));
+    child.on('error', () => finish(new Error('Không khởi động được Gemini CLI. Kiểm tra lại cài đặt.')));
     child.stdout.on('data', chunk => { stdout += chunk; if (stdout.length > 250000) abort(); });
     child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-4000); });
     child.stdin.on('error', () => {});
     child.on('close', code => {
       if (settled) return;
       try {
-        if (code !== 0) throw new Error('Gemini CLI failed. Open a terminal, run gemini and sign in with Google. Check your account quota and CLI version.');
+        if (code !== 0) throw new Error('Gemini CLI chưa trả lời được. Chạy gemini trong terminal để kiểm tra đăng nhập Google, hạn mức tài khoản và phiên bản CLI.');
         const result = JSON.parse(stdout);
-        if (result.error || typeof result.response !== 'string' || !result.response.trim()) throw new Error('Gemini returned no answer. Check your quota and login.');
+        if (result.error || typeof result.response !== 'string' || !result.response.trim()) throw new Error('Gemini không trả về câu trả lời. Kiểm tra hạn mức và đăng nhập.');
         finish(null, result.response);
       } catch (error) { finish(error); }
     });
@@ -65,17 +65,18 @@ function createBridge({ token = randomBytes(32).toString('hex'), runner, allowed
     }
     const supplied = req.headers.authorization || '';
     const expected = `Bearer ${token}`;
-    if (!/^Bearer [a-f0-9]{64}$/.test(supplied) || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) return send(401, { error: 'Connection code invalid. Open the link printed by the bridge again.' });
+    if (!/^Bearer [a-f0-9]{64}$/.test(supplied) || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) return send(401, { error: 'Mã kết nối không hợp lệ. Mở lại link được in trong cửa sổ cầu nối.' });
     if (req.method === 'GET' && req.url === '/health') return send(200, { ready: true, provider: 'Gemini CLI', login: 'Use the Google account signed into Gemini CLI on this machine.' });
     if (req.method !== 'POST' || req.url !== '/ask') return send(404, { error: 'Route not found.' });
     if (req.headers['content-type']?.split(';')[0] !== 'application/json') return send(415, { error: 'JSON required.' });
-    if (busy) return send(429, { error: 'Gemini is answering another question. Wait and try again.' });
+    if (busy) return send(429, { error: 'Gemini đang trả lời câu khác. Hãy đợi rồi thử lại.' });
     busy = true;
     const controller = new AbortController();
     res.on('close', () => { if (!res.writableEnded) controller.abort(); });
     const timer = setTimeout(() => controller.abort(), 155000);
     try {
       let body = '';
+      req.setEncoding('utf8');
       for await (const chunk of req) {
         body += chunk;
         if (Buffer.byteLength(body) > 180000) { send(413, { error: 'Prompt too large.' }); return; }
@@ -94,12 +95,12 @@ function createBridge({ token = randomBytes(32).toString('hex'), runner, allowed
 }
 if (require.main === module) {
   const cli = findCLI();
-  if (!cli) { console.error('Install Node.js 22+ and Gemini CLI: npm install -g @google/gemini-cli\nThen run gemini and choose Sign in with Google.\nCustom install: set GEMINI_CLI_ENTRY to the CLI bundle/gemini.js file (or dist/index.js on older versions).'); process.exitCode = 1; }
+  if (!cli) { console.error('Cài Node.js 22+ và Gemini CLI: npm install -g @google/gemini-cli\nSau đó chạy gemini và chọn Sign in with Google.\nNếu cài ở vị trí khác: đặt GEMINI_CLI_ENTRY tới bundle/gemini.js (hoặc dist/index.js của bản cũ).'); process.exitCode = 1; }
   else {
     const bridge = createBridge({ runner: makeRunner(cli) });
-    bridge.server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? 'The bridge is already running on port 14583. Use that terminal or stop it first.' : 'Could not start the local bridge.'); process.exitCode = 1; });
+    bridge.server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? 'Cổng 14583 đã được sử dụng. Dùng cửa sổ cầu nối đang mở hoặc dừng nó trước.' : 'Không mở được cầu nối cục bộ.'); process.exitCode = 1; });
     bridge.server.listen(port, '127.0.0.1', () => {
-      console.log(`Gemini bridge runs only on this machine. Keep this terminal open.\nOpen this PRIVATE connection link (do not share it):\n${site}#gemini-bridge=${bridge.token}\n\nConnection code: ${bridge.token}\nAllow local network access if Chrome asks. Ctrl+C stops the bridge.`);
+      console.log(`Cầu nối Gemini chỉ chạy trên máy này. Giữ cửa sổ này mở.\nMở link kết nối RIÊNG bên dưới (không chia sẻ link này):\n${site}#gemini-bridge=${bridge.token}\n\nMã kết nối: ${bridge.token}\nCho phép truy cập mạng cục bộ khi Chrome hỏi. Nhấn Ctrl+C để dừng cầu nối.`);
     });
   }
 }

@@ -77,7 +77,7 @@
   }
   async function connectBridge(token) {
     if (token) bridgeToken = token.trim();
-    return bridgeRequest('/health', null, AbortSignal.timeout(5000));
+    return bridgeRequest('/health', null, AbortSignal.timeout(30000));
   }
   async function run({ provider, question, level, answer, history = [], mode = 'grade', signal }) {
     if (!['chrome', 'gemini'].includes(provider)) throw new Error('Nguồn AI không hợp lệ.');
