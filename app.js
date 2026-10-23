@@ -2,6 +2,7 @@
 const paths = [
   { topic: 'Database', title: 'Database' },
   { topic: 'Java', title: 'Java' },
+  { topic: 'Spring', title: 'Spring' },
   { topic: 'Kafka', title: 'Kafka' },
   { topic: 'Redis', title: 'Redis' },
   { topic: 'Keycloak', title: 'Keycloak' },
@@ -10,6 +11,7 @@ const paths = [
 const studySubjects = [
   { ...databaseSubject, slug: 'database', project: databaseProject },
   { ...javaSubject, slug: 'java', project: javaProject },
+  { ...springSubject, slug: 'spring', project: springProject },
   {
     topic: 'Kafka', slug: 'kafka', sources: kafkaGuide.sources, lessons: kafkaLessons,
     groups: kafkaGuide.groups.map(group => ({ ...group, topic: 'Kafka' })), questions: kafkaQuestions,
