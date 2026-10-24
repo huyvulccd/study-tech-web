@@ -6,7 +6,7 @@ function studyQuestion(id, kind, title, answer, minimum, middle, followUp, frame
   return { id, kind, title, answer, minimum, middle, deep: followUp[0], deepAnswer: followUp[1], frame, sources };
 }
 function defineStudySubject({ topic, scope, sources, chapters }) {
-  const prefix = topic === 'Design pattern' ? 'pattern' : topic.toLowerCase();
+  const prefix = topic === 'Design pattern' ? 'pattern' : topic === 'Web & API' ? 'webapi' : topic.toLowerCase();
   const groups = chapters.map(chapter => ({ id: `${prefix}-${chapter.id}`, title: chapter.title, topic, questionIds: chapter.questions.map(question => question.id) }));
   return {
     topic, scope, sources, groups,

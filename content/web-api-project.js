@@ -1,0 +1,72 @@
+const webApiProject = {
+  topic: 'Web & API', name: 'Thiết kế HTTP API trong bối cảnh Car Sharing',
+  context: 'Mô tả dự án đã có booking với logical hold/lock ngắn, tìm kiếm member và xử lý CSV. Chưa có source Controller, DTO, SecurityFilterChain hoặc API contract production để xác nhận route, annotations, status, idempotency key hay job API thực tế.',
+  introduction: 'Ba case là đề xuất luyện phỏng vấn dựa trên nghiệp vụ đã cung cấp. Học cách nối HTTP contract → Controller/binding/validation → quyền và use case → response/lỗi; không nhận các thiết kế minh họa dưới đây là phần đã triển khai.',
+  sources: webApiSubject.sources,
+  cases: [
+    {
+      id: 'webapi-project-booking', status: 'proposal', title: 'Tạo booking: DTO, validation, conflict & retry sau timeout',
+      basis: 'Dự án đã mô tả booking có cạnh tranh xe, logical hold và validation dài. POST /bookings, DTO, error codes và Idempotency-Key ở đây là phương án API để luyện giải thích, chưa xác nhận production.',
+      perspective: 'Member cần biết đặt xe đã thành công, đang xử lý hay bị từ chối; khi mạng lỗi không tạo thêm booking ngoài ý định và không được đặt thay member khác bằng cách đổi JSON.',
+      problem: 'Controller nhận entity và tin memberId/status từ client; DTO constraints được dùng như bằng chứng xe đang trống. Response mất sau commit khiến retry tạo thêm side effect, trong khi lỗi parse, conflict và server đều trả một dạng 200.',
+      why: 'DTO/validation giữ biên input rõ; principal/quyền quyết định actor, use case bảo vệ invariant lúc ghi. Idempotency nhận diện retry cùng ý định còn status/error contract cho client biết hành động tiếp theo.',
+      flow: ['Security xác minh caller; không dùng memberId tùy ý làm identity.', 'Controller bind request DTO, kiểm tra field bắt buộc/range/time relation.', 'Kiểm tra idempotency scope/payload và claim theo protocol atomic.', 'Use case thực hiện hold/finalize với quyền và điều kiện hiện tại; không giữ DB transaction dài chỉ để chờ HTTP.', 'Map completed/pending/business conflict/unknown result theo contract; trả resource hoặc job URI thích hợp.', 'Retry/status lookup dùng cùng ý định; recovery xử lý crash window và downstream result chưa rõ.'],
+      roles: ['HTTP layer quản method/path/status/headers và schema lỗi.', 'DTO constraints kiểm tra input, không xác minh xe còn trống tại lúc ghi.', 'Security/use case xác định actor và quyền/state transitions.', 'DB/idempotency protocol bảo vệ invariant và kết quả qua cạnh tranh/restart.'],
+      implementation: [
+        { title: 'Input và lỗi có thể sửa', text: 'Request chỉ nhận các field sản phẩm cho phép, ví dụ vehicleId và khoảng thời gian. Field của identity/price/state do server quyết định theo policy.', points: ['Malformed JSON/conversion và constraint errors có mã/schema rõ.', 'Nested object cần cascade và non-null riêng nếu bắt buộc.', 'Cross-field time range hợp lệ chưa chứng minh lịch xe không overlap.'] },
+        { title: 'Kết quả và retry', text: 'Nếu đã tạo resource, 201 và Location/DTO là lựa chọn; nếu mới nhận xử lý, 202 cần cách theo dõi. Conflict cần phản ánh điều kiện thật thay vì gán mọi lỗi thành 409.', points: ['Key có actor/operation scope, fingerprint và retention.', 'Gắn key/result với side effect trong protocol transaction/recovery phù hợp.', 'Test timeout sau commit, request đồng thời và payload đổi với cùng key.'] },
+        { title: 'Không hứa quá protocol', text: 'Idempotency không thay invariant đặt xe; hai key khác nhau vẫn có thể tranh cùng resource. Logical hold phải được kiểm tra lại khi finalize, API timeout không tự hủy hold hoặc rollback provider ngoài.', points: ['Phân biệt thất bại xác nhận và kết quả chưa biết.', 'Không mở retry vô hạn hoặc xóa pending key tùy tiện.', 'Có quyền đọc/status/replay theo caller.'] },
+      ], frame: ['HTTP/input contract', 'Principal và quyền', 'Invariant booking', 'Idempotency/crash', 'Status/error và test'],
+      spoken: 'Trong bối cảnh booking của dự án, em có thể đề xuất API nhận DTO nhỏ thay vì entity, lấy member từ principal đã xác minh và validate input trước khi gọi use case. Xe còn trống phải được kiểm tra và bảo vệ tại critical write, không giao cho NotNull/Positive. Vì timeout có thể xảy ra sau commit, em thiết kế idempotency key có scope, payload policy và state bền gắn với kết quả; không chỉ dùng local map. API phân biệt đã tạo, đang xử lý và conflict, có cách theo dõi. Route/status/key cụ thể ở đây là đề xuất cần đối chiếu contract thực.',
+      questions: [
+        { title: 'Positive vehicleId và Valid đã ngăn đặt trùng chưa?', answer: 'Chưa. Chúng kiểm tra input; xe tồn tại/được quyền/khả dụng và invariant cạnh tranh phải do use case/nguồn ghi bảo vệ.' },
+        { title: 'Client timeout có nên tạo key mới rồi gọi lại không?', answer: 'Không cho cùng ý định. Kết quả đầu có thể đã commit; giữ key và retry/status theo contract, có recovery cho trạng thái chưa rõ.' },
+        { title: 'Khi nào trả 201, khi nào 202?', answer: '201 khi kết quả là resource đã tạo theo contract; 202 khi mới nhận xử lý chưa hoàn tất và cần tracking. Status không tự tạo durability hoặc bảo đảm job thành công.' },
+      ], sources: ['body', 'validation', 'http', 'idempotency', 'authorization'],
+    },
+    {
+      id: 'webapi-project-members', status: 'proposal', title: 'Tìm member: query DTO, pagination & quyền dữ liệu',
+      basis: 'Đã mô tả tối ưu tìm kiếm member/query/index. SearchMemberCriteria, sort/cursor và HTTP cache/version behavior dưới đây là đề xuất; chưa xác nhận ứng dụng hiện dùng cơ chế nào.',
+      perspective: 'Nhân viên tìm đúng member trong phạm vi quyền, xem trang kết quả đủ thông tin mà không lộ dữ liệu nhạy cảm hoặc làm DB tải toàn bộ bảng.',
+      problem: 'Endpoint nhận filter/sort tùy ý, size không giới hạn, entity response lộ field; list/count không cùng scope. Pagination thiếu stable order dẫn tới lặp/sót và bị hiểu nhầm thành lỗi UI.',
+      why: 'Query DTO và allowlist làm contract rõ; scope quyền nằm trong truy vấn, response DTO giữ field cần thiết. Stable order và strategy pagination giúp việc duyệt dữ liệu có ý nghĩa và chi phí kiểm soát được.',
+      flow: ['Xác minh nhân viên/tenant và action được phép.', 'Bind filter/query DTO theo MVC, convert và validate size/type/range.', 'Map allowlisted filters/sort vào parameterized query có quyền.', 'Đọc page/cursor với stable order/index; count chỉ khi contract cần và cùng scope.', 'Trả DTO/metadata giới hạn theo quyền, áp cache policy cho dữ liệu cá nhân.', 'Test cross-tenant, sort bằng nhau, trang sâu và dữ liệu đổi giữa hai lần gọi.'],
+      roles: ['Controller giữ query/media/error contract.', 'Criteria DTO chỉ biểu diễn filter được cho phép.', 'Query/service enforce tenant/object/field access từ principal.', 'DB/query plan/index quyết định chi phí; pagination annotation không tự làm query nhanh.'],
+      implementation: [
+        { title: 'Binding không đồng nghĩa tin input', text: 'ModelAttribute có thể gom query criteria; InitBinder tùy chỉnh đúng đường WebDataBinder. Không nhận raw orderBy SQL hoặc coi tenantId từ query là bằng chứng quyền.', points: ['Missing/type/range là lỗi khác nhau.', 'Default/max size được server enforce.', 'Không đưa token/password vào query URL.'] },
+        { title: 'Kết quả và consistency', text: 'Dùng response DTO chỉ chứa field cần thiết, order có tie-breaker; chọn offset hoặc keyset theo UX/dữ liệu. Cursor được kiểm tra và không thay quyền.', points: ['Count query không tự là N+1 và có thể đắt riêng.', 'Stable tie-breaker không tự tạo snapshot khi dữ liệu thay đổi.', 'Cache profile/member data cần policy riêng; private không là authorization.'] },
+      ], frame: ['Search contract', 'Binding/limits', 'Quyền trong query', 'Stable order/page', 'DTO/cache/test'],
+      spoken: 'Dự án có tối ưu tìm kiếm member; về Web & API em đề xuất criteria DTO cho filter, giới hạn size và sort allowlist. Tenant/phạm vi không lấy từ input như một quyền tự khai mà áp từ principal/policy vào query, cả count lẫn data. Em trả response DTO và chọn offset/cursor với thứ tự ổn định, không nói cursor tự là snapshot. Hiệu năng vẫn cần đo query plan/index và payload, còn dữ liệu cá nhân cần cache policy phù hợp. Đây là hướng mở rộng từ nghiệp vụ, không xác nhận annotation/route production.',
+      questions: [
+        { title: 'Đã ẩn field trên UI thì API có thể trả entity đầy đủ không?', answer: 'Không nên dựa vào UI để bảo vệ field. API cần serialization/DTO và field-level policy, tránh lộ credential/internal data hoặc lazy graph không cần thiết.' },
+        { title: 'Client gửi tenantId đúng kiểu có đủ scope chưa?', answer: 'Chưa. Nó là input; server phải xác minh principal được phép truy cập tenant đó và áp scope vào mọi query/count/export.' },
+        { title: 'Thêm cursor có tự giải query chậm không?', answer: 'Không. Cần query/keyset/order/index phù hợp và đo. Base64 page/offset không tự tạo hiệu năng, cursor cũng không là permission.' },
+      ], sources: ['model', 'binder', 'paging', 'authorization', 'caching'],
+    },
+    {
+      id: 'webapi-project-csv', status: 'proposal', title: 'CSV import/export: file input, job API & kết quả có quyền',
+      basis: 'Dự án đã có xử lý CSV và Spring Batch. Multipart endpoints, 202 job resource, polling/cancel/download contract là đề xuất để luyện thiết kế API; không xác nhận production có các route hay state này.',
+      perspective: 'Nhân viên gửi/nhận CSV lớn mà không treo màn hình; biết việc đã được nhận, lỗi ở dòng nào và ai được tải kết quả. Restart không được làm mất việc đã nhận nếu contract hứa durable processing.',
+      problem: 'Upload được đọc hết vào RAM, filename thành đường dẫn tùy ý; 202 được trả rồi job chạy trong thread tạm. Export của tenant A lại được user B tải qua job ID đoán được; lỗi giữa stream bị trộn JSON vào CSV.',
+      why: 'File input cần trust boundary/limits; tác vụ dài cần state/admission/dispatch rõ. Job và file kết quả đều là resource có ownership/lifecycle, không chỉ một link cho UI.',
+      flow: ['Xác thực action/tenant và giới hạn upload/job concurrency.', 'Bind metadata/file, kiểm tra size/schema/parser bounds, lưu bằng storage key an toàn.', 'Persist job và dispatch theo protocol phục hồi được nếu cần durability.', 'Trả 202 cùng cách theo dõi; worker xử lý bounded/chunk và cập nhật state/errors.', 'Status/result/cancel kiểm tra quyền, polling/retention theo contract.', 'Download đặt media/disposition đúng, quản stream/disconnect và cleanup file tạm/kết quả.'],
+      roles: ['HTTP layer diễn đạt acceptance, polling và safe error schema.', 'Upload/parser coi filename/MIME/nội dung là untrusted.', 'Job/worker quản durability, retry/checkpoint và partial result policy.', 'Security/storage kiểm soát ownership và retention cả đầu vào lẫn kết quả.'],
+      implementation: [
+        { title: 'Giới hạn và validation nhiều lớp', text: 'Giới hạn byte/request/part ở hạ tầng phù hợp, row/cell/column ở parser và điều kiện business ở use case. Validation DTO không thay file parsing hoặc concurrency limits.', points: ['Không dùng originalFilename làm path đích trực tiếp.', 'Streaming mà gom mọi row vào list vẫn có thể OOM.', 'Giới hạn số lỗi giữ trong RAM/trả về; báo dòng và mã lỗi cần thiết thay vì toàn bộ dữ liệu nhạy cảm.'] },
+        { title: 'Job có trạng thái thật', text: '202 chưa là hoàn tất; lưu job/dispatch cần tránh crash gap. Worker có thể retry nên side effects/import cần idempotent/chunk protocol; hủy không tự rollback phần đã commit.', points: ['Phân biệt cancel requested và cancelled.', 'Không lộ dữ liệu dòng nhạy cảm trong error report.', 'Test restart, file sai, quá size, worker fail và cross-user download.'] },
+        { title: 'Response và lifecycle kết quả', text: 'Job URI/result link đều phải kiểm tra quyền hoặc cơ chế cấp quyền có contract rõ. File tạm/kết quả có retention và cleanup, stream đóng nguồn khi client ngắt.', points: ['Không append ProblemDetail vào file đã gửi một phần.', 'Polling có giới hạn/backoff phù hợp.', 'Không hứa HTTP timeout là job đã dừng.'] },
+      ], frame: ['File trust/limits', 'Durable admission', 'Job states/recovery', 'Ownership/result', 'Failure/cleanup tests'],
+      spoken: 'Với CSV và Batch của dự án, em có thể đề xuất API upload nhỏ gọn, giới hạn file và parser, lưu bằng key do server tạo. Nếu xử lý dài thì nhận thành job bền theo contract, trả 202 với status URI thay vì giữ request vô hạn; Spring async đơn thuần không làm job sống qua restart. Worker cần chunk/retry và policy partial result, còn status/cancel/download đều kiểm tra quyền tenant. Khi stream đã gửi một phần thì không đổi sang JSON error như response mới. Đây là thiết kế luyện mở rộng, chưa phải contract production đã xác nhận.',
+      questions: [
+        { title: 'MultipartFile đã kiểm tra MIME/filename an toàn chưa?', answer: 'Chưa. Chúng do client khai; cần storage key/path an toàn, allowlist/nội dung/parser bounds và quyền theo use case.' },
+        { title: 'Spring Batch đã có thì 202 tự bảo đảm job không mất chưa?', answer: 'Không chỉ từ framework/status. Phải kiểm tra job repository/launch/dispatch/state và crash windows thực tế, cùng mức bảo đảm ứng dụng công bố.' },
+        { title: 'User biết jobId có được tải CSV không?', answer: 'Không mặc định. Job/result đều cần ownership/tenant/action policy hoặc cơ chế cấp quyền rõ; ID khó đoán không thay authorization.' },
+      ], sources: ['multipart', 'uploads', 'http', 'async', 'authorization', 'disposition'],
+    },
+  ],
+  exclusions: [
+    { title: 'Contract production chưa được cung cấp', reason: 'Routes, DTO, validation groups, status/error codes, idempotency và security configuration trong case chỉ là đề xuất để đối chiếu sau.' },
+    { title: 'WebFlux, GraphQL, gRPC và protocol internals', reason: 'Môn này tập trung HTTP API và Servlet Spring MVC cho Middle/Middle+; mở rộng khi yêu cầu công việc cần.' },
+    { title: 'AI chạy trực tiếp trên website', reason: 'Website chỉ sao chép mục học/case và prompt debate để dùng ở công cụ người học chọn; không gọi AI API.' },
+  ],
+};
