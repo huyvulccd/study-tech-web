@@ -10,6 +10,12 @@ const state = {
 };
 let topic = 'Kafka';
 let kind = 'all';
+let webApiLevel = 'all';
+function matchesTopicAndLevel(item) {
+  if (topic !== 'all' && item.topic !== topic) return false;
+  if (topic !== 'Web & API' || webApiLevel === 'all') return true;
+  return webApiLevel === 'fresher' ? item.level === 'Fresher' : item.level !== 'Fresher';
+}
 const opened = new Set();
 const openedTopics = new Set();
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
@@ -29,8 +35,9 @@ function renderConcept(concept) {
 function renderProjectFlow(steps) {
   return `<ol class="project-flow">${steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>`;
 }
-function renderDebateActions(key) {
-  return `<div class="debate-actions"><label><span class="sr-only">Mức debate</span><select data-debate-level aria-label="Mức debate"><option>Middle</option><option>Middle+</option></select></label><button type="button" data-debate-copy="${escapeHtml(key)}">Copy mục + prompt debate</button><span class="debate-status" role="status"></span></div>`;
+function renderDebateActions(key, level) {
+  const options = level === 'Fresher' ? '<option>Fresher</option>' : '<option>Middle</option><option>Middle+</option>';
+  return `<div class="debate-actions"><label><span class="sr-only">Mức debate</span><select data-debate-level aria-label="Mức debate">${options}</select></label><button type="button" data-debate-copy="${escapeHtml(key)}">Copy mục + prompt debate</button><span class="debate-status" role="status"></span></div>`;
 }
 function renderProjectCase(item, index, project) {
   const prefix = `project-${item.id}`;
@@ -64,8 +71,9 @@ const projectSearchText = new Map(projectCases.map(item => [item.id, [
 let projectBeforeSearch = null;
 function filterProject(search) {
   const section = $('#project-section');
-  const enabled = Boolean(topic === 'all' || subjectsByTopic[topic]) && kind !== 'theory' && !$('#only-saved').checked;
-  const visible = projectCases.filter(item => (topic === 'all' || item.topic === topic) && projectSearchText.get(item.id).includes(search));
+  const fresherOnly = topic === 'Web & API' && webApiLevel === 'fresher';
+  const enabled = Boolean(topic === 'all' || subjectsByTopic[topic]) && kind !== 'theory' && !$('#only-saved').checked && !fresherOnly;
+  const visible = projectCases.filter(item => !fresherOnly && (topic === 'all' || item.topic === topic) && projectSearchText.get(item.id).includes(search));
   if (search && projectBeforeSearch === null) {
     projectBeforeSearch = new Map([section, ...section.querySelectorAll('details')].map(item => [item.id, item.open]));
   }
@@ -101,7 +109,7 @@ function renderTheory(group) {
     ${renderExample(example)}
     ${comparison}<h4>Giới hạn & đánh đổi</h4><ul class="theory-tradeoffs">${lesson.tradeoffs.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
     <p class="sources theory-sources">Đọc thêm: ${renderSources(lesson.sources, group.topic)}</p>
-    ${renderDebateActions(`lesson:${group.id}`)}
+    ${renderDebateActions(`lesson:${group.id}`, group.level)}
   </section>`;
 }
 const lessonSearchText = new Map(studyGroups.map(group => {
@@ -114,7 +122,7 @@ function persist() {
   catch { $('#note-status').textContent = 'Chưa lưu được. Thay đổi hiện chỉ giữ trong phiên này.'; }
 }
 function renderStats() {
-  const selected = questions.filter(question => topic === 'all' || question.topic === topic);
+  const selected = questions.filter(matchesTopicAndLevel);
   const groupCount = studyGroups.filter(group => selected.some(question => question.group === group.id)).length;
   $('#section-title').textContent = topic === 'all' ? 'Chủ đề học' : `Chủ đề học ${topic}`;
   $('#question-total').textContent = `${groupCount} chủ đề · ${selected.length} câu hỏi`;
@@ -124,7 +132,21 @@ function renderGuide() {
   const selected = studySubjects.filter(subject => topic === 'all' || subject.topic === topic);
   $('#study-guide').hidden = !selected.length;
   $('#kind-filters').hidden = !selected.length;
-  $('#study-guide').innerHTML = selected.length ? `<details class="guide-details"><summary>${escapeHtml(topic === 'all' ? 'Khung ôn tập' : topic)} · Middle / Middle+ <span>Cách trả lời & phạm vi học</span></summary><div class="guide-body"><p><strong>Lý thuyết:</strong> Định nghĩa → vì sao cần → cơ chế và quy tắc → ví dụ → giới hạn.</p><p><strong>Tình huống:</strong> Làm rõ giả định → khoanh vùng bằng dữ liệu → giải pháp → rủi ro → kiểm chứng.</p><p><strong>Mức trả lời:</strong> Middle cần giải thích được cơ chế và cửa sổ lỗi. Phần hỏi thêm dùng để luyện Middle+; không cần nhớ mọi tuning hạ tầng. Thử nói trong 30–60 giây trước khi mở đáp án. Đây là khung tự luyện, không phải chuẩn tuyển dụng cố định.</p>${selected.map(subject => `<p class="scope"><strong>${escapeHtml(subject.topic)}:</strong> ${escapeHtml(subject.scope)}</p>`).join('')}</div></details>` : '';
+  $('#web-api-level-filters').hidden = topic !== 'Web & API';
+  document.querySelectorAll('[data-webapi-level]').forEach(button => {
+    const active = button.dataset.webapiLevel === webApiLevel;
+    button.classList.toggle('active', active); button.setAttribute('aria-pressed', active);
+  });
+  const fresherOnly = topic === 'Web & API' && webApiLevel === 'fresher';
+  const includesFresher = topic === 'all' || (topic === 'Web & API' && webApiLevel === 'all');
+  const levels = fresherOnly ? 'Fresher' : includesFresher ? 'Fresher (Web & API) · Middle / Middle+' : 'Middle / Middle+';
+  const scenarioGuide = fresherOnly ? 'Làm rõ input/kết quả → xác định bước lỗi → giải pháp → kiểm chứng.' : 'Làm rõ giả định → khoanh vùng bằng dữ liệu → giải pháp → rủi ro → kiểm chứng.';
+  const expectations = fresherOnly
+    ? 'Fresher cần định nghĩa đúng, giải thích vì sao cần, đọc được một request/response và triển khai endpoint có DTO/validation/lỗi cơ bản. Phần tự kiểm tra củng cố kiến thức, chưa yêu cầu thiết kế phân tán hoặc tuning.'
+    : `${includesFresher ? 'Fresher Web & API học nền tảng và endpoint cơ bản. ' : ''}Middle cần giải thích cơ chế và cửa sổ lỗi; phần hỏi thêm dùng để luyện Middle+, không yêu cầu nhớ mọi tuning hạ tầng.`;
+  const scope = subject => topic === 'Web & API' && webApiLevel !== 'all'
+    ? subject.levelScopes[fresherOnly ? 'Fresher' : 'Middle / Middle+'] : subject.scope;
+  $('#study-guide').innerHTML = selected.length ? `<details class="guide-details"><summary>${escapeHtml(topic === 'all' ? 'Khung ôn tập' : topic)} · ${escapeHtml(levels)} <span>Cách trả lời & phạm vi học</span></summary><div class="guide-body"><p><strong>Lý thuyết:</strong> Định nghĩa → vì sao cần → cơ chế và quy tắc → ví dụ → giới hạn.</p><p><strong>Tình huống:</strong> ${escapeHtml(scenarioGuide)}</p><p><strong>Mức trả lời:</strong> ${escapeHtml(expectations)} Thử nói trong 30–60 giây trước khi mở đáp án. Đây là khung tự luyện, không phải chuẩn tuyển dụng cố định.</p>${selected.map(subject => `<p class="scope"><strong>${escapeHtml(subject.topic)}:</strong> ${escapeHtml(scope(subject))}</p>`).join('')}</div></details>` : '';
 }
 function renderQuestion(question) {
   const q = question;
@@ -140,9 +162,9 @@ function renderQuestion(question) {
       <div class="note-meta">${escapeHtml(q.topic)} / ${escapeHtml(q.level)}</div>
       <h4>Trả lời ngắn khi phỏng vấn</h4><p class="answer">${escapeHtml(q.answer)}</p>
       <p class="answer-frame"><strong>Khung trả lời</strong><span>${escapeHtml(q.frame)}</span></p>
-      <dl class="answer-levels"><dt>1. Nền tảng</dt><dd>${foundation}${example}</dd><dt>2. Middle cần nêu</dt><dd><ul>${q.middle.map(point => `<li>${escapeHtml(point)}</li>`).join('')}</ul></dd></dl>
+      <dl class="answer-levels"><dt>1. Nền tảng</dt><dd>${foundation}${example}</dd><dt>2. ${q.level === 'Fresher' ? 'Fresher' : 'Middle'} cần nêu</dt><dd><ul>${q.middle.map(point => `<li>${escapeHtml(point)}</li>`).join('')}</ul></dd></dl>
       ${pitfalls}
-      <details class="follow-up"><summary>3. Đào sâu: ${escapeHtml(q.deep)}</summary><p>${escapeHtml(q.deepAnswer)}</p></details>
+      <details class="follow-up"><summary>3. ${q.level === 'Fresher' ? 'Tự kiểm tra' : 'Đào sâu'}: ${escapeHtml(q.deep)}</summary><p>${escapeHtml(q.deepAnswer)}</p></details>
       <p class="sources">Đối chiếu: ${sourceLinks}</p>
       <div class="note-actions"><label><input type="checkbox" data-done="${q.id}" ${state.done.includes(q.id) ? 'checked' : ''}> Đã hiểu, đã ôn</label><button class="save-button" data-save="${q.id}" aria-pressed="${state.saved.includes(q.id)}">${state.saved.includes(q.id) ? 'Đã lưu để ôn lại' : 'Lưu để ôn lại'}</button></div>
     </div></details>`;
@@ -152,14 +174,15 @@ function renderQuestions() {
   document.querySelectorAll('.note').forEach(note => { if (note.open) opened.add(note.dataset.id); else opened.delete(note.dataset.id); });
   document.querySelectorAll('[data-group]').forEach(section => { if (section.open) openedTopics.add(section.dataset.group); else openedTopics.delete(section.dataset.group); });
   const search = $('#search-input').value.trim().toLocaleLowerCase('vi');
-  const selected = questions.filter(q => topic === 'all' || q.topic === topic);
+  const selected = questions.filter(matchesTopicAndLevel);
   const visible = selected.filter(q => (kind === 'all' || q.kind === kind) && (!$('#only-saved').checked || state.saved.includes(q.id)) && [lessonSearchText.get(q.group), questionSearchText.get(q.id)].join(' ').includes(search));
   const visibleGroups = studyGroups.filter(group => visible.some(q => q.group === group.id));
   const projectCount = filterProject(search);
   $('#results-status').textContent = selected.length ? `${visibleGroups.length} chủ đề · ${visible.length}/${selected.length} câu hỏi kiến thức${projectCount ? ` · ${projectCount} case dự án` : ''}` : '';
   $('#question-list').innerHTML = visible.length ? studyGroups.map(group => {
     const items = visible.filter(q => q.group === group.id);
-    return items.length ? `<details class="learning-topic" data-group="${group.id}" ${openedTopics.has(group.id) || search ? 'open' : ''}><summary><span class="learning-title">${topic === 'all' ? `<span class="subject-label">${escapeHtml(group.topic)} · </span>` : ''}${escapeHtml(group.title)}</span><span class="topic-count">${items.length} câu hỏi</span></summary><div class="topic-content">${renderTheory(group)}<section class="topic-practice" aria-labelledby="practice-${group.id}"><h3 id="practice-${group.id}">Câu hỏi phỏng vấn <span>${items.length} câu</span></h3><div class="topic-questions">${items.map(renderQuestion).join('')}</div></section></div></details>` : '';
+    const levelBadge = group.topic === 'Web & API' ? `<span class="lesson-level">${escapeHtml(group.level)}</span>` : '';
+    return items.length ? `<details class="learning-topic" data-group="${group.id}" data-level="${escapeHtml(group.level || 'Middle / Middle+')}" ${openedTopics.has(group.id) || search ? 'open' : ''}><summary><span class="learning-title">${topic === 'all' ? `<span class="subject-label">${escapeHtml(group.topic)} · </span>` : ''}${escapeHtml(group.title)}</span>${levelBadge}<span class="topic-count">${items.length} câu hỏi</span></summary><div class="topic-content">${renderTheory(group)}<section class="topic-practice" aria-labelledby="practice-${group.id}"><h3 id="practice-${group.id}">Câu hỏi phỏng vấn <span>${items.length} câu</span></h3><div class="topic-questions">${items.map(renderQuestion).join('')}</div></section></div></details>` : '';
   }).join('') : `<p class="empty">${selected.length ? (search && projectCount ? 'Các case dự án khớp từ khóa nằm ở phần bên dưới.' : 'Chưa có câu hỏi phù hợp. Thử đổi loại câu hỏi, từ khóa hoặc bộ lọc đã lưu.') : `${escapeHtml(topic)}: chưa có nội dung.`}</p>`;
   document.querySelectorAll('[data-group]').forEach(section => section.addEventListener('toggle', () => { if (!section.isConnected) return; if (section.open) openedTopics.add(section.dataset.group); else openedTopics.delete(section.dataset.group); }));
   document.querySelectorAll('.note').forEach(note => note.addEventListener('toggle', () => { if (!note.isConnected) return; if (note.open) opened.add(note.dataset.id); else opened.delete(note.dataset.id); }));
@@ -177,6 +200,11 @@ document.querySelectorAll('[data-kind]').forEach(button => button.addEventListen
   kind = button.dataset.kind;
   document.querySelectorAll('[data-kind]').forEach(item => { item.classList.toggle('active', item === button); item.setAttribute('aria-pressed', item === button); });
   renderQuestions();
+}));
+document.querySelectorAll('[data-webapi-level]').forEach(button => button.addEventListener('click', () => {
+  if (topic !== 'Web & API') return;
+  webApiLevel = button.dataset.webapiLevel;
+  renderStats(); renderGuide(); renderQuestions();
 }));
 $('#search-input').addEventListener('input', renderQuestions);
 $('#only-saved').addEventListener('change', renderQuestions);

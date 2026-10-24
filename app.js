@@ -13,7 +13,14 @@ const studySubjects = [
   { ...databaseSubject, slug: 'database', project: databaseProject },
   { ...javaSubject, slug: 'java', project: javaProject },
   { ...springSubject, slug: 'spring', project: springProject },
-  { ...webApiSubject, slug: 'web-api', project: webApiProject },
+  {
+    ...webApiSubject, slug: 'web-api', project: webApiProject,
+    groups: [...webApiFresherSubject.groups, ...webApiSubject.groups],
+    lessons: { ...webApiFresherSubject.lessons, ...webApiSubject.lessons },
+    questions: [...webApiFresherSubject.questions, ...webApiSubject.questions],
+    scope: 'Hai lộ trình riêng: Fresher học HTTP/API và endpoint MVC cơ bản; Middle/Middle+ mở rộng cơ chế, failure và thiết kế tích hợp. Chọn mức ở bộ lọc của môn Web & API. Ví dụ Java 17+/Spring MVC 6.1+, jakarta.*; các case dự án là đề xuất.',
+    levelScopes: { Fresher: webApiFresherSubject.scope, 'Middle / Middle+': webApiSubject.scope },
+  },
   {
     topic: 'Kafka', slug: 'kafka', sources: kafkaGuide.sources, lessons: kafkaLessons,
     groups: kafkaGuide.groups.map(group => ({ ...group, topic: 'Kafka' })), questions: kafkaQuestions,

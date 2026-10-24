@@ -9,6 +9,7 @@
 <script src="content/java.js" defer></script><script src="content/java-project.js" defer></script>
 <script src="content/spring.js" defer></script><script src="content/spring-project.js" defer></script>
 <script src="content/web-api.js" defer></script><script src="content/web-api-project.js" defer></script>
+<script src="content/web-api-fresher.js" defer></script>
 <script src="app.js" defer></script><script src="notes.js" defer></script><script src="debate.js" defer></script>
 </head>
 <body>
@@ -19,13 +20,14 @@
 <div class="topic-links" aria-label="Chủ đề"></div>
 <section id="study-guide" class="study-guide" aria-label="Khung ôn tập"></section>
 <div class="tools"><label class="search"><span aria-hidden="true">⌕</span><input type="search" id="search-input" placeholder="Tìm kiến thức, câu hỏi, dự án…" aria-label="Tìm kiến thức, câu hỏi hoặc dự án"></label><label class="saved-filter"><input type="checkbox" id="only-saved"> Chỉ câu đã lưu <span id="saved-count"></span></label></div>
+<div id="web-api-level-filters" class="kind-filters level-filters" role="group" aria-label="Mức học Web & API" hidden><span>Mức học</span><button type="button" data-webapi-level="all" aria-pressed="true" class="active">Tất cả mức</button><button type="button" data-webapi-level="fresher" aria-pressed="false">Fresher</button><button type="button" data-webapi-level="middle" aria-pressed="false">Middle / Middle+</button></div>
 <div id="kind-filters" class="kind-filters" aria-label="Loại câu hỏi"><button data-kind="all" class="active">Tất cả</button><button data-kind="theory">Lý thuyết</button><button data-kind="scenario">Xử lý tình huống</button></div>
 <p id="results-status" class="results-status" role="status"></p>
 <div id="question-list"></div>
 <details id="project-section" class="learning-topic project-section" hidden></details>
 <p id="note-status" role="status"></p>
 </section>
-<footer>Nội dung tập trung cho phỏng vấn Backend Middle / Middle+.</footer>
+<footer>Ôn phỏng vấn Backend Middle / Middle+ · Web & API có thêm mức Fresher.</footer>
 </main>
 <dialog id="debate-dialog" aria-labelledby="debate-title"><div class="debate-dialog-heading"><h2 id="debate-title">Sao chép nội dung debate</h2><button type="button" data-debate-close>Đóng</button></div><p>Nhấn Ctrl+C hoặc Cmd+C để sao chép nội dung đang chọn, rồi dán vào công cụ AI bạn muốn dùng.</p><label for="debate-prompt">Nội dung mục học và prompt debate</label><textarea id="debate-prompt" readonly rows="14"></textarea><button type="button" data-debate-select>Chọn toàn bộ</button></dialog>
 </body></html>
