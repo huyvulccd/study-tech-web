@@ -97,24 +97,112 @@ function filterProject(search) {
   $('#project-count').textContent = `${visible.length} case · ${visible.reduce((total, item) => total + item.questions.length, 0)} câu hỏi`;
   return enabled ? visible.length : 0;
 }
-function renderTheory(group) {
+function renderMechanismReference(group) {
   const lesson = studyLessons[group.id];
   const example = lesson.example || questions.find(question => question.group === group.id && question.example)?.example;
   const comparison = lesson.comparison?.length ? `<h4>Chọn cách nào?</h4><div class="comparison-scroll"><table class="pattern-comparison"><thead><tr><th scope="col">Lựa chọn</th><th scope="col">Khi phù hợp</th><th scope="col">Chi phí cần nhận</th></tr></thead><tbody>${lesson.comparison.map(row => `<tr><th scope="row">${escapeHtml(row.option)}</th><td>${escapeHtml(row.when)}</td><td>${escapeHtml(row.cost)}</td></tr>`).join('')}</tbody></table></div>` : '';
-  return `<section class="topic-theory" aria-labelledby="theory-${group.id}">
-    <h3 id="theory-${group.id}">Lý thuyết nền tảng</h3><p class="theory-intro">${escapeHtml(lesson.overview)}</p>
-    <div class="theory-reason"><h4>${escapeHtml(lesson.whyTitle || 'Vì sao cần những cơ chế này?')}</h4><p>${escapeHtml(lesson.problem)}</p><p>${escapeHtml(lesson.solution)}</p></div>
-    <h4>Các khái niệm cần hiểu</h4><dl class="theory-concepts">${lesson.concepts.map(renderConcept).join('')}</dl>
+  return `<details class="mechanism-reference" ${lesson.walkthrough ? '' : 'open'}><summary>Khái niệm, quy tắc & cách trả lời phỏng vấn</summary><div>
+    <dl class="theory-concepts">${lesson.concepts.map(renderConcept).join('')}</dl>
     <h4>Luồng hoạt động</h4><ol class="theory-flow">${lesson.workflow.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
     ${renderExample(example)}
     ${comparison}<h4>Giới hạn & đánh đổi</h4><ul class="theory-tradeoffs">${lesson.tradeoffs.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+    </div></details>`;
+}
+function renderTheory(group) {
+  const lesson = studyLessons[group.id];
+  return `<section class="topic-theory" aria-labelledby="theory-${group.id}">
+    <h3 id="theory-${group.id}">Lý thuyết nền tảng</h3><p class="theory-intro">${escapeHtml(lesson.overview)}</p>
+    <div class="theory-reason"><h4>${escapeHtml(lesson.whyTitle || 'Vì sao cần những cơ chế này?')}</h4><p>${escapeHtml(lesson.problem)}</p><p>${escapeHtml(lesson.solution)}</p></div>
+    ${lesson.walkthrough ? `<p class="mechanism-preview"><strong>Ví dụ:</strong> ${escapeHtml(lesson.walkthrough.title)}</p>` : ''}
+    <button type="button" class="mechanism-open" data-mechanism-open="${escapeHtml(group.id)}" aria-haspopup="dialog" aria-controls="mechanism-dialog">Chi tiết cơ chế <span aria-hidden="true">↗</span></button>
     <p class="sources theory-sources">Đọc thêm: ${renderSources(lesson.sources, group.topic)}</p>
     ${renderDebateActions(`lesson:${group.id}`, group.level)}
   </section>`;
 }
+const stepSearchText = step => [step.title, step.app, step.command, step.redis, step.result, ...step.state.flat()].join(' ').toLocaleLowerCase('vi');
+function walkthroughSearchText(walkthrough) {
+  return walkthrough ? [walkthrough.title, walkthrough.scenario, ...walkthrough.terms.flat(), ...walkthrough.steps.map(stepSearchText), walkthrough.conclusion, ...walkthrough.check].join(' ') : '';
+}
+function renderWalkthroughStep(walkthrough, index) {
+  const step = walkthrough.steps[index];
+  return `<p class="mechanism-step-count">Bước ${index + 1}/${walkthrough.steps.length}</p><h4>${escapeHtml(step.title)}</h4>
+    <dl class="mechanism-step-flow"><dt>Ứng dụng làm gì?</dt><dd>${escapeHtml(step.app)}</dd>
+    ${step.command ? `<dt>Lệnh / thao tác</dt><dd><pre><code>${escapeHtml(step.command)}</code></pre></dd>` : ''}
+    <dt>Redis làm gì?</dt><dd>${escapeHtml(step.redis)}</dd><dt>Kết quả</dt><dd>${escapeHtml(step.result)}</dd></dl>
+    <div class="comparison-scroll"><table class="mechanism-state"><caption>Trạng thái ở bước này</caption><thead><tr><th scope="col">Nơi giữ</th><th scope="col">Dữ liệu</th><th scope="col">Trạng thái</th></tr></thead><tbody>${step.state.map(row => `<tr>${row.map((cell, i) => i === 0 ? `<th scope="row">${escapeHtml(cell)}</th>` : `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function renderWalkthrough(walkthrough, index) {
+  return `<section class="mechanism-walkthrough" aria-labelledby="walkthrough-title"><p class="mechanism-label">Ví dụ minh họa · Chọn từng bước để theo dõi</p><h3 id="walkthrough-title">${escapeHtml(walkthrough.title)}</h3><p>${escapeHtml(walkthrough.scenario)}</p><p class="mechanism-context">A/B là hai tiến trình backend; DB là cơ sở dữ liệu gốc. Key, giá và thời hạn chỉ dùng để minh họa. Các bước mô tả sẵn diễn biến, không chạy lệnh trên Redis thật.</p>
+    <dl class="mechanism-terms">${walkthrough.terms.map(([term, meaning]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(meaning)}</dd>`).join('')}</dl>
+    <div class="mechanism-steps" role="group" aria-label="Các bước của ví dụ">${walkthrough.steps.map((step, i) => `<button type="button" data-mechanism-step="${i}" aria-controls="mechanism-step-panel" aria-pressed="${i === index}">${i + 1}. ${escapeHtml(step.title)}</button>`).join('')}</div>
+    <div id="mechanism-step-panel" class="mechanism-step-panel" aria-live="polite" aria-atomic="true">${renderWalkthroughStep(walkthrough, index)}</div>
+    <p class="mechanism-conclusion"><strong>Cần nhớ:</strong> ${escapeHtml(walkthrough.conclusion)}</p>
+    <details class="mechanism-check"><summary>Tự kiểm tra: ${escapeHtml(walkthrough.check[0])}</summary><p>${escapeHtml(walkthrough.check[1])}</p></details></section>`;
+}
+const mechanismSteps = new Map();
+const mechanismDialog = $('#mechanism-dialog');
+let mechanismGroup = null;
+let mechanismOpener = null;
+function restoreMechanismFocus() {
+  if (mechanismDialog.open) return;
+  document.body.classList.remove('mechanism-opened');
+  if (mechanismOpener?.isConnected) mechanismOpener.focus();
+  mechanismOpener = null;
+}
+function closeMechanism() {
+  if (typeof mechanismDialog.close === 'function') mechanismDialog.close();
+  else mechanismDialog.removeAttribute('open');
+  restoreMechanismFocus();
+}
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-mechanism-open]');
+  if (!button) return;
+  const group = studyGroups.find(item => item.id === button.dataset.mechanismOpen);
+  if (!group) return;
+  const lesson = studyLessons[group.id];
+  mechanismGroup = group.id;
+  mechanismOpener = button;
+  let index = mechanismSteps.get(group.id) || 0;
+  const search = $('#search-input').value.trim().toLocaleLowerCase('vi');
+  if (search && lesson.walkthrough) {
+    const match = lesson.walkthrough.steps.findIndex(step => stepSearchText(step).includes(search));
+    if (match >= 0) index = match;
+  }
+  mechanismSteps.set(group.id, index);
+  $('#mechanism-title').textContent = `${group.topic} · ${group.title}`;
+  $('#mechanism-content').innerHTML = `${lesson.walkthrough ? renderWalkthrough(lesson.walkthrough, index) : ''}${renderMechanismReference(group)}<p class="sources">Đối chiếu: ${renderSources(lesson.sources, group.topic)}</p>`;
+  $('#mechanism-content').scrollTop = 0;
+  document.body.classList.add('mechanism-opened');
+  if (!mechanismDialog.open) {
+    if (typeof mechanismDialog.showModal === 'function') mechanismDialog.showModal();
+    else mechanismDialog.setAttribute('open', '');
+  }
+  $('[data-mechanism-close]').focus();
+});
+mechanismDialog.addEventListener('click', event => {
+  if (event.target.closest('[data-mechanism-close]')) { closeMechanism(); return; }
+  const button = event.target.closest('[data-mechanism-step]');
+  if (!button || !mechanismGroup) return;
+  const walkthrough = studyLessons[mechanismGroup].walkthrough;
+  const index = Number(button.dataset.mechanismStep);
+  if (!walkthrough || !Number.isInteger(index) || !walkthrough.steps[index]) return;
+  mechanismSteps.set(mechanismGroup, index);
+  mechanismDialog.querySelectorAll('[data-mechanism-step]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+  $('#mechanism-step-panel').innerHTML = renderWalkthroughStep(walkthrough, index);
+});
+mechanismDialog.addEventListener('cancel', event => { event.preventDefault(); closeMechanism(); });
+mechanismDialog.addEventListener('close', restoreMechanismFocus);
+mechanismDialog.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { event.preventDefault(); closeMechanism(); return; }
+  if (event.key !== 'Tab') return;
+  const focusable = [...mechanismDialog.querySelectorAll('button, a[href], summary')].filter(item => !item.closest('details:not([open])') || item.matches('details:not([open]) > summary'));
+  const first = focusable[0], last = focusable.at(-1);
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
 const lessonSearchText = new Map(studyGroups.map(group => {
   const lesson = studyLessons[group.id];
-  return [group.id, [group.topic, group.title, lesson.overview, lesson.whyTitle || '', lesson.problem, lesson.solution, ...lesson.concepts.flatMap(concept => [concept.term, concept.meaning, concept.purpose, ...(concept.rules || []), concept.practicalExample || '', concept.interviewAnswer || '']), ...lesson.workflow, ...lesson.tradeoffs, lesson.example?.code || '', lesson.example?.explanation || '', ...(lesson.comparison || []).flatMap(row => [row.option, row.when, row.cost])].join(' ').toLocaleLowerCase('vi')];
+  return [group.id, [group.topic, group.title, lesson.overview, lesson.whyTitle || '', lesson.problem, lesson.solution, ...lesson.concepts.flatMap(concept => [concept.term, concept.meaning, concept.purpose, ...(concept.rules || []), concept.practicalExample || '', concept.interviewAnswer || '']), ...lesson.workflow, ...lesson.tradeoffs, lesson.example?.code || '', lesson.example?.explanation || '', ...(lesson.comparison || []).flatMap(row => [row.option, row.when, row.cost]), walkthroughSearchText(lesson.walkthrough)].join(' ').toLocaleLowerCase('vi')];
 }));
 const questionSearchText = new Map(questions.map(q => [q.id, [q.title, q.answer, q.minimum, ...q.middle, q.deep, q.deepAnswer, q.frame, ...(q.basics || []).flatMap(item => [item.term, item.text]), ...(q.pitfalls || []), q.example?.code || '', q.example?.explanation || ''].join(' ').toLocaleLowerCase('vi')]));
 function persist() {

@@ -38,6 +38,12 @@ Bắt đầu ngay bằng một câu hỏi phù hợp với chủ đề này.`;
   const bullets = values => (values || []).map(value => `- ${value}`).join('\n');
   const section = (title, value) => value ? `\n${title}\n${value}\n` : '';
   const example = value => value ? section(value.title || 'Ví dụ', `${value.code || ''}\n${value.explanation || ''}`) : '';
+  const walkthrough = value => value ? section('Chi tiết cơ chế — ví dụ minh họa', [
+    value.title, value.scenario,
+    ...value.terms.map(([term, meaning]) => `${term}: ${meaning}`),
+    ...value.steps.map((step, i) => `Bước ${i + 1}: ${step.title}\nỨng dụng: ${step.app}\nLệnh / thao tác:\n${step.command || '(Chưa gửi lệnh Redis)'}\nRedis: ${step.redis}\nKết quả: ${step.result}\nTrạng thái:\n${step.state.map(row => row.join(' | ')).join('\n')}`),
+    `Cần nhớ: ${value.conclusion}`, `Tự kiểm tra: ${value.check[0]}\n${value.check[1]}`,
+  ].join('\n\n')) : '';
   const catalog = new Map();
   studySubjects.forEach(subject => subject.groups.forEach(group => {
     const lesson = subject.lessons[group.id];
@@ -45,6 +51,7 @@ Bắt đầu ngay bằng một câu hỏi phù hợp với chủ đề này.`;
     const sourceIds = [...new Set([...lesson.sources, ...practice.flatMap(question => question.sources)])];
     const content = [
       section('Tổng quan', lesson.overview), section(lesson.whyTitle || 'Vì sao cần?', `${lesson.problem}\n${lesson.solution}`),
+      walkthrough(lesson.walkthrough),
       ...lesson.concepts.map(concept => section(concept.term, [concept.meaning, `Vì sao cần: ${concept.purpose}`, `Quy tắc:\n${bullets(concept.rules)}`, `Ví dụ: ${concept.practicalExample}`, `Cách trả lời khi phỏng vấn: ${concept.interviewAnswer}`].join('\n'))),
       section('Luồng hoạt động', bullets(lesson.workflow)), example(lesson.example || practice.find(question => question.example)?.example),
       section('Lựa chọn và đánh đổi', (lesson.comparison || []).map(row => `${row.option}: ${row.when}\nChi phí: ${row.cost}`).join('\n')),
